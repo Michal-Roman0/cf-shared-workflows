@@ -1,0 +1,184 @@
+name: CF Terraform
+
+on:
+  workflow_call:
+    inputs:
+      # Required: Path inside the calling repo where Terraform code lives
+      terraform_working_directory:
+        required: true
+        type: string
+        default: "AWS_ECS_app"
+
+      # Terraform variables (passed as JSON string or individual inputs)
+      tf_vars:
+        required: false
+        type: string
+        default: "{}"
+
+      # AWS specifics
+      aws_region:
+        required: true
+        type: string
+      terraform_plan_role_arn:
+        required: true
+        type: string
+      terraform_apply_role_arn:
+        required: true
+        type: string
+
+      # ECS / ECR / Docker
+      ecr_repository:
+        required: false
+        type: string
+        default: "main-repo"
+      docker_context:
+        required: false
+        type: string
+        default: "flask-app"
+
+      # Control flags
+      run_docker_build:
+        required: false
+        type: boolean
+        default: true
+      run_apply:
+        required: false
+        type: boolean
+        default: false  
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    environment: ecs-task   # make this an input too
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform_working_directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.1"
+
+      - name: Configure AWS Credentials (Plan)
+        uses: aws-actions/configure-aws-credentials@v6.0.0
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ inputs.terraform_plan_role_arn }}
+          role-session-name: Github-Plan
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.52.0
+          cache: true
+
+      - name: Init TFLint
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run TFLint
+        run: tflint -f compact --recursive
+
+      - name: Terraform Plan
+        env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
+          # Merge any additional TF vars passed as JSON
+        run: |
+          if [ -n "${{ inputs.tf_vars }}" ] && [ "${{ inputs.tf_vars }}" != "{}" ]; then
+            echo "${{ inputs.tf_vars }}" > tfvars.json
+            terraform plan -var-file=tfvars.json -out=plan.tfplan
+          else
+            terraform plan -out=plan.tfplan
+          fi
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ inputs.terraform_working_directory }}/plan.tfplan
+
+  build-and-push:  # Run if Docker build is enabled
+    needs: plan
+    if: inputs.run_docker_build == true
+    runs-on: ubuntu-latest
+    environment: ecs-task
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (for ECR)
+        uses: aws-actions/configure-aws-credentials@v6.0.0
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ inputs.terraform_apply_role_arn }}
+          role-session-name: Github-ECR
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        run: |
+          aws ecr get-login-password --region "${{ inputs.aws_region }}" | \
+            docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+
+      - name: Build, tag and push Docker image
+        if: inputs.run_docker_build == true
+        run: |
+          cd ${{ inputs.docker_context }}
+          FULL_NAME="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.ecr_repository }}"
+          docker build -t "${FULL_NAME}:latest" .
+          docker push "${FULL_NAME}:latest"
+          echo "image_tag=latest" >> $GITHUB_OUTPUT   # Optional: output for later use
+
+  apply:
+    needs: [plan, build-and-push]
+    if: inputs.run_apply == true && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ecs-task
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform_working_directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.1"
+
+      - name: Configure AWS Credentials (Apply)
+        uses: aws-actions/configure-aws-credentials@v6.0.0
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ inputs.terraform_apply_role_arn }}
+          role-session-name: Github-Apply
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ./
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve plan.tfplan
