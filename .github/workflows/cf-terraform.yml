@@ -35,20 +35,20 @@ on:
         description: "Github environment name to use"
 
       # ECS / ECR / Docker
-      ecr_repository:
-        required: false
-        type: string
-        default: "main-repo"
-      docker_context:
-        required: false
-        type: string
-        default: "flask-app"
+      # ecr_repository:
+      #   required: false
+      #   type: string
+      #   default: "main-repo"
+      # docker_context:
+      #   required: false
+      #   type: string
+      #   default: "flask-app"
 
       # Control flags
-      run_docker_build:
-        required: false
-        type: boolean
-        default: true
+      # run_docker_build:
+      #   required: false
+      #   type: boolean
+      #   default: true
       run_apply:
         required: false
         type: boolean
@@ -127,31 +127,31 @@ jobs:
           name: tfplan
           path: ./${{ inputs.terraform_working_directory }}/plan.tfplan
 
-  build-and-push:  # Run if Docker build is enabled
-    needs: plan
-    if: inputs.run_docker_build == true
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    defaults:
-      run:
-        working-directory: ${{ inputs.terraform_working_directory }}
+  # build-and-push:  # Run if Docker build is enabled
+  #   needs: plan
+  #   if: inputs.run_docker_build == true
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ inputs.environment }}
+  #   defaults:
+  #     run:
+  #       working-directory: ${{ inputs.terraform_working_directory }}
         
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials (for ECR)
-        uses: aws-actions/configure-aws-credentials@v6.0.0
-        with:
-          aws-region: ${{ inputs.aws_region }}
-          role-to-assume: ${{ inputs.terraform_apply_role_arn }}
-          role-session-name: Github-ECR
+  #     - name: Configure AWS Credentials (for ECR)
+  #       uses: aws-actions/configure-aws-credentials@v6.0.0
+  #       with:
+  #         aws-region: ${{ inputs.aws_region }}
+  #         role-to-assume: ${{ inputs.terraform_apply_role_arn }}
+  #         role-session-name: Github-ECR
 
-      - name: Log in to Amazon ECR
-        id: ecr-login
-        run: |
-          aws ecr get-login-password --region "${{ inputs.aws_region }}" | \
-            docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
+  #     - name: Log in to Amazon ECR
+  #       id: ecr-login
+  #       run: |
+  #         aws ecr get-login-password --region "${{ inputs.aws_region }}" | \
+  #           docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
 
       - name: Build, tag and push Docker image
         if: inputs.run_docker_build == true
