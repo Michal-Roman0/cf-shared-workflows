@@ -26,6 +26,11 @@ on:
         required: true
         type: string
 
+      environment:
+        required: true
+        type: string
+        description: "Github environment name to use"
+
       # ECS / ECR / Docker
       ecr_repository:
         required: false
@@ -53,7 +58,7 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
-    environment: task-env   # make this an input too
+    environment: ${{ inputs.environment }}
     defaults:
       run:
         working-directory: ${{ inputs.terraform_working_directory }}
@@ -119,7 +124,7 @@ jobs:
     needs: plan
     if: inputs.run_docker_build == true
     runs-on: ubuntu-latest
-    environment: ecs-task
+    environment: ${{ inputs.environment }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -150,7 +155,7 @@ jobs:
     needs: [plan, build-and-push]
     if: inputs.run_apply == true && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: ecs-task
+    environment: ${{ inputs.environment }}
     defaults:
       run:
         working-directory: ${{ inputs.terraform_working_directory }}
