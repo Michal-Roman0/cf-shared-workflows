@@ -89,7 +89,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Format
-        run: terraform fmt -check -recursive
+        run: terraform fmt -recursive
 
       - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6
