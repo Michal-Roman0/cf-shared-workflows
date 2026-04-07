@@ -51,10 +51,9 @@ on:
         type: boolean
         default: false
 
-      secrets:
-      # Optional
-      pass: true
-
+    # secrets:
+    # Optional
+    
 permissions:
   contents: read
   id-token: write
