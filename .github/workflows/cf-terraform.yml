@@ -10,10 +10,13 @@ on:
         default: "AWS_ECS_app"
 
       # Terraform variables (passed as JSON string or individual inputs)
-      tf_vars:
-        required: false
+      # tf_vars:
+      #   required: false
+      #   type: string
+      #   default: "{}"
+      state_bucket_name:
+        required: true
         type: string
-        default: "{}"
 
       # AWS specifics
       aws_region:
@@ -108,14 +111,15 @@ jobs:
       - name: Terraform Plan
         env:
           TF_VAR_aws_region: ${{ inputs.aws_region }}
-          # Merge any additional TF vars passed as JSON
+          TF_VAR_website_bucket_name: ${{ inputs.state_bucket_name }}
         run: |
-          if [ -n "${{ inputs.tf_vars }}" ] && [ "${{ inputs.tf_vars }}" != "{}" ]; then
-            echo "${{ inputs.tf_vars }}" > tfvars.json
-            terraform plan -var-file=tfvars.json -out=plan.tfplan
-          else
-            terraform plan -out=plan.tfplan
-          fi
+          terraform plan -out=plan.tfplan
+      # if [ -n "${{ inputs.tf_vars }}" ] && [ "${{ inputs.tf_vars }}" != "{}" ]; then
+      #   echo "${{ inputs.tf_vars }}" > tfvars.json
+      #   terraform plan -var-file=tfvars.json -out=plan.tfplan
+      # else
+      #   terraform plan -out=plan.tfplan
+      # fi
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
