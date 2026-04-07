@@ -49,7 +49,11 @@ on:
       run_apply:
         required: false
         type: boolean
-        default: false  
+        default: false
+
+      secrets:
+      # Optional
+      pass: true
 
 permissions:
   contents: read
