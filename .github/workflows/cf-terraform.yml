@@ -60,6 +60,10 @@ on:
 permissions:
   contents: read
   id-token: write
+  
+defaults:
+  run:
+    working-directory: AWS_ECS_app
 
 jobs:
   plan:
