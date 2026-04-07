@@ -60,10 +60,6 @@ on:
 permissions:
   contents: read
   id-token: write
-  
-defaults:
-  run:
-    working-directory: AWS_ECS_app
 
 jobs:
   plan:
@@ -129,13 +125,17 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
-          path: ${{ inputs.terraform_working_directory }}/plan.tfplan
+          path: ./${{ inputs.terraform_working_directory }}/plan.tfplan
 
   build-and-push:  # Run if Docker build is enabled
     needs: plan
     if: inputs.run_docker_build == true
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform_working_directory }}
+        
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -191,7 +191,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan
-          path: ./
+          path: ./${{ inputs.terraform_working_directory }}/
 
       - name: Terraform Init
         run: terraform init
