@@ -3,7 +3,7 @@ name: CF Terraform
 on:
   workflow_call:
     inputs:
-      # Required: Path inside the calling repo where Terraform code lives
+      # Path inside the calling repo where Terraform code lives
       terraform_working_directory:
         required: true
         type: string
@@ -53,7 +53,7 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
-    environment: ecs-task   # make this an input too
+    environment: task-env   # make this an input too
     defaults:
       run:
         working-directory: ${{ inputs.terraform_working_directory }}
@@ -67,7 +67,7 @@ jobs:
         with:
           terraform_version: "1.14.1"
 
-      - name: Configure AWS Credentials (Plan)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6.0.0
         with:
           aws-region: ${{ inputs.aws_region }}
@@ -80,7 +80,7 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
-      - name: Terraform Format Check
+      - name: Terraform Format
         run: terraform fmt -check -recursive
 
       - name: Setup TFLint
