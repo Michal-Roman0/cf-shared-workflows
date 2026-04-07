@@ -153,17 +153,17 @@ jobs:
   #         aws ecr get-login-password --region "${{ inputs.aws_region }}" | \
   #           docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
 
-      - name: Build, tag and push Docker image
-        if: inputs.run_docker_build == true
-        run: |
-          cd ${{ inputs.docker_context }}
-          FULL_NAME="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.ecr_repository }}"
-          docker build -t "${FULL_NAME}:latest" .
-          docker push "${FULL_NAME}:latest"
-          echo "image_tag=latest" >> $GITHUB_OUTPUT   # Optional: output for later use
+      # - name: Build, tag and push Docker image
+      #   if: inputs.run_docker_build == true
+      #   run: |
+      #     cd ${{ inputs.docker_context }}
+      #     FULL_NAME="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.ecr_repository }}"
+      #     docker build -t "${FULL_NAME}:latest" .
+      #     docker push "${FULL_NAME}:latest"
+      #     echo "image_tag=latest" >> $GITHUB_OUTPUT   # Optional: output for later use
 
   apply:
-    needs: [plan, build-and-push]
+    needs: [plan]
     if: inputs.run_apply == true && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
