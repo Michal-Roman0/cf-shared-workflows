@@ -1,22 +1,31 @@
 # This is a basic workflow to help you get started with Actions
 
-name: EKS Create Cluster
+name: Create Cluster EKS
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_call:
+    inputs:
+      working_directory:
+        required: true
+        type: string
+        default: "AWS_ECS_app"
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
+      # AWS specifics
+      aws_region:
+        required: true
+        type: string
+      cluster_creation_role_arn:
+        required: true
+        type: string
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+      kubernetes_namespace:
+        required: false
+        type: string
+        default: default
+
 jobs:
   apply_kubernetes_resources: 
-      if: ${{ github.event_name == 'workflow_dispatch' }}
       name: Deploy nginx to EKS
       runs-on: ubuntu-latest
       
@@ -25,7 +34,7 @@ jobs:
         contents: read
   
       env:
-        KUBE_NAMESPACE: nginx-test
+        KUBE_NAMESPACE: ${{ inputs.kubernetes_namespace }}
         
       steps:
         - name: Checkout Repository
@@ -34,8 +43,8 @@ jobs:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v6.0.0
           with:
-            aws-region: ${{ vars.AWS_REGION }}
-            role-to-assume: arn:aws:iam::097853039117:role/github-terraform-plan
+            aws-region: ${{ inputs.aws_region }}
+            role-to-assume: ${{ inputs.cluster_creation_role_arn }}
             role-session-name: Github-Kubernetes
   
         - name: Setup kubectl
@@ -49,7 +58,7 @@ jobs:
               --region eu-central-1 \
               --name task-eks
         - name: Deploy nginx (Deployment + LoadBalancer Service)
-          working-directory: "Cloud_Cluster_EKS"
+          working-directory: ${{ inputs.working_directory }}
           run: |
             # Deploy nginx
             if kubectl get namespace "$KUBE_NAMESPACE" >/dev/null 2>&1; then
@@ -60,8 +69,6 @@ jobs:
             # kubectl run nginx --image=nginx:latest --port=80 --namespace=nginx-test
             # kubectl expose pod nginx --port=80 --type=LoadBalancer --name=nginx-service --namespace=nginx-test
             kubectl apply -f eks-test-pod.yaml
-        # - name: Wait for deployment
-        #   run: kubectl rollout status deployment/nginx --timeout=60s
   
         - name: Wait for LoadBalancer
           run: |
