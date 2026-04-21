@@ -111,7 +111,7 @@ jobs:
               --set clusterName=task-eks \
               --set serviceAccount.create=false \
               --set serviceAccount.name=aws-load-balancer-controller \
-              --set vpcID=$VPC_ID \
+              --set vpcId=$VPC_ID \
               --set region=${{inputs.aws_region}} \
               --version 1.14.0
             # Verify if installed correctly
