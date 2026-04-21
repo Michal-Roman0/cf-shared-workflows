@@ -86,6 +86,7 @@ jobs:
               --override-existing-serviceaccounts \
               --region ${{inputs.aws_region}} \
               --approve
+              
         - name: Install Helm
           if: inputs.use_load_balancer_controller == true
           run: |
@@ -98,13 +99,32 @@ jobs:
           run: |
             helm repo add eks https://aws.github.io/eks-charts
             helm repo update eks
+
+            VPC_ID=$(aws ec2 describe-vpcs \
+              --filters "Name=tag:Name,Values=eks-app-vpc" \
+              --query "Vpcs[0].VpcId" --output text)
+
+            echo "Debug: $VPC_ID"
+            
             helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
               -n kube-system \
               --set clusterName=task-eks \
               --set serviceAccount.create=false \
               --set serviceAccount.name=aws-load-balancer-controller \
+              --set vpcID=$VPC_ID \
+              --set region=${{inputs.aws_region}} \
               --version 1.14.0
+            # Verify if installed correctly
+            kubectl get deployment -n kube-system aws-load-balancer-controller
+
+        # - name: Get VPC ID from AWS
+        #   if: inputs.use_load_balancer_controller == true
+        #   id: vpc_get
+        #   run: |
+
           
+
+  
         - name: Deploy nginx (Deployment + LoadBalancer Service)
           working-directory: ${{ inputs.working_directory }}
           run: |
