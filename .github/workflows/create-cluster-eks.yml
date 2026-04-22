@@ -89,20 +89,28 @@ jobs:
             else
               aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy --policy-document file://iam_policy.json
             fi
+            eksctl create iamserviceaccount \
+              --cluster=task-eks \
+              --namespace=kube-system \
+              --name=aws-load-balancer-controller \
+              --attach-policy-arn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/AWSLoadBalancerControllerIAMPolicy \
+              --override-existing-serviceaccounts \
+              --region ${{inputs.aws_region}} \
+              --approve
 
             # create EKS IAM service account if it doesn't exist
-            if kubectl get serviceaccount aws-load-balancer-controller -n kube-system >/dev/null 2>&1; then
-              echo "service account exists, skipping eksctl"
-            else
-              eksctl create iamserviceaccount \
-                --cluster=task-eks \
-                --namespace=kube-system \
-                --name=aws-load-balancer-controller \
-                --attach-policy-arn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/AWSLoadBalancerControllerIAMPolicy \
-                --override-existing-serviceaccounts \
-                --region ${{inputs.aws_region}} \
-                --approve
-            fi
+            # if kubectl get serviceaccount aws-load-balancer-controller -n kube-system >/dev/null 2>&1; then
+            #   echo "service account exists, skipping eksctl"
+            # else
+            #   eksctl create iamserviceaccount \
+            #     --cluster=task-eks \
+            #     --namespace=kube-system \
+            #     --name=aws-load-balancer-controller \
+            #     --attach-policy-arn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:policy/AWSLoadBalancerControllerIAMPolicy \
+            #     --override-existing-serviceaccounts \
+            #     --region ${{inputs.aws_region}} \
+            #     --approve
+            # fi
             
         - name: Install Helm
           if: inputs.use_load_balancer_controller == true
