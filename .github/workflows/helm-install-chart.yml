@@ -93,7 +93,7 @@ jobs:
           if: ${{ inputs.db_host != '' }}
           run: |
             helm upgrade --install myapp ./helm-chart \
-              --namespace production \
+              --namespace ${{ inputs.kubernetes_namespace }} \
               --create-namespace \
               --set dbHost=${{ inputs.db_host }} \
               --set dbPort=${{ inputs.db_port }} \
