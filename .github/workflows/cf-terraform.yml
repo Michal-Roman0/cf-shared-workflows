@@ -34,29 +34,29 @@ on:
         type: string
         description: "Github environment name to use"
 
-      # ECS / ECR / Docker
-      # ecr_repository:
-      #   required: false
-      #   type: string
-      #   default: "main-repo"
-      # docker_context:
-      #   required: false
-      #   type: string
-      #   default: "flask-app"
-
-      # Control flags
-      # run_docker_build:
-      #   required: false
-      #   type: boolean
-      #   default: true
       run_apply:
+        required: false
+        type: boolean
+        default: false
+
+      output_DB_vars:
         required: false
         type: boolean
         default: false
 
     # secrets:
     # Optional
-    
+    outputs:
+      db_host:
+        description: "DB host"
+        value: ${{ jobs.apply.outputs.db_host }}
+      db_port:
+        description: "DB port"
+        value: ${{ jobs.apply.outputs.db_port }}
+      db_name:
+        description: "DB name"
+        value: ${{ jobs.apply.outputs.db_name }}
+  
 permissions:
   contents: read
   id-token: write
@@ -114,12 +114,6 @@ jobs:
           TF_VAR_website_bucket_name: ${{ inputs.state_bucket_name }}
         run: |
           terraform plan -out=plan.tfplan
-      # if [ -n "${{ inputs.tf_vars }}" ] && [ "${{ inputs.tf_vars }}" != "{}" ]; then
-      #   echo "${{ inputs.tf_vars }}" > tfvars.json
-      #   terraform plan -var-file=tfvars.json -out=plan.tfplan
-      # else
-      #   terraform plan -out=plan.tfplan
-      # fi
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -127,46 +121,15 @@ jobs:
           name: tfplan
           path: ./${{ inputs.terraform_working_directory }}/plan.tfplan
 
-  # build-and-push:  # Run if Docker build is enabled
-  #   needs: plan
-  #   if: inputs.run_docker_build == true
-  #   runs-on: ubuntu-latest
-  #   environment: ${{ inputs.environment }}
-  #   defaults:
-  #     run:
-  #       working-directory: ${{ inputs.terraform_working_directory }}
-        
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-
-  #     - name: Configure AWS Credentials (for ECR)
-  #       uses: aws-actions/configure-aws-credentials@v6.0.0
-  #       with:
-  #         aws-region: ${{ inputs.aws_region }}
-  #         role-to-assume: ${{ inputs.terraform_apply_role_arn }}
-  #         role-session-name: Github-ECR
-
-  #     - name: Log in to Amazon ECR
-  #       id: ecr-login
-  #       run: |
-  #         aws ecr get-login-password --region "${{ inputs.aws_region }}" | \
-  #           docker login --username AWS --password-stdin "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com"
-
-      # - name: Build, tag and push Docker image
-      #   if: inputs.run_docker_build == true
-      #   run: |
-      #     cd ${{ inputs.docker_context }}
-      #     FULL_NAME="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ inputs.aws_region }}.amazonaws.com/${{ inputs.ecr_repository }}"
-      #     docker build -t "${FULL_NAME}:latest" .
-      #     docker push "${FULL_NAME}:latest"
-      #     echo "image_tag=latest" >> $GITHUB_OUTPUT   # Optional: output for later use
-
   apply:
     needs: [plan]
     if: inputs.run_apply == true && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    outputs:
+      db_host: ${{ steps.set.outputs.db_host }}
+      db_port: ${{ steps.set.outputs.db_port }}
+      db_name: ${{ steps.set.outputs.db_name }}
     defaults:
       run:
         working-directory: ${{ inputs.terraform_working_directory }}
@@ -198,3 +161,23 @@ jobs:
 
       - name: Terraform Apply
         run: terraform apply -auto-approve plan.tfplan
+
+      - name: Extract Terraform outputs (optional) and set step outputs
+        id: set
+        if: ${{inputs.output_DB_vars}}
+        run: |
+          # default to empty
+          DB_HOST=""
+          DB_PORT=""
+          DB_NAME=""
+
+          if [ -f outputs.json ]; then
+            # extract but allow jq to produce "null" or empty; use || to keep empty
+            DB_HOST=$(jq -r '.rds_address.value // empty' outputs.json || true)
+            DB_PORT=$(jq -r '.rds_port.value // empty' outputs.json || true)
+            DB_NAME=$(jq -r '.rds_db_name.value // empty' outputs.json || true)
+          fi
+
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
