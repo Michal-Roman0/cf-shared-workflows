@@ -175,22 +175,22 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve plan.tfplan
 
-      # - name: Extract Terraform outputs (optional) and set step outputs
-      #   id: set
-      #   if: ${{inputs.output_DB_vars}}
-      #   run: |
-      #     # default to empty
-      #     DB_HOST=""
-      #     DB_PORT=""
-      #     DB_NAME=""
+      - name: Extract Terraform outputs (optional) and set step outputs
+        id: set
+        if: ${{inputs.output_DB_vars}}
+        run: |
+          # default to empty
+          DB_HOST=""
+          DB_PORT=""
+          DB_NAME=""
 
-      #     if [ -f outputs.json ]; then
-      #       # extract but allow jq to produce "null" or empty; use || to keep empty
-      #       DB_HOST=$(jq -r '.rds_address.value // empty' outputs.json || true)
-      #       DB_PORT=$(jq -r '.rds_port.value // empty' outputs.json || true)
-      #       DB_NAME=$(jq -r '.rds_db_name.value // empty' outputs.json || true)
-      #     fi
+          if [ -f outputs.json ]; then
+            # extract but allow jq to produce "null" or empty; use || to keep empty
+            DB_HOST=$(jq -r '.rds_address.value // empty' outputs.json || true)
+            DB_PORT=$(jq -r '.rds_port.value // empty' outputs.json || true)
+            DB_NAME=$(jq -r '.rds_db_name.value // empty' outputs.json || true)
+          fi
 
-      #     echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
-      #     echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
-      #     echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
