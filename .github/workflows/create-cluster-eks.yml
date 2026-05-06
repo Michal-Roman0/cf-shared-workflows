@@ -78,9 +78,9 @@ jobs:
             
             sudo install -m 0755 /tmp/eksctl /usr/local/bin && rm /tmp/eksctl
 
-        - name: Associate OICD with cluster # probably required if terraform apply was run from somewhere else
-          run: |
-            eksctl utils associate-iam-oidc-provider --region=eu-central-1 --cluster=task-eks --approve
+        # - name: Associate OICD with cluster # probably required if terraform apply was run from somewhere else
+        #   run: |
+        #     eksctl utils associate-iam-oidc-provider --region=eu-central-1 --cluster=task-eks --approve
         
         - name: Create Policies for Load Balancer Controller
           if: inputs.use_load_balancer_controller == true
