@@ -202,22 +202,22 @@ jobs:
             # kubectl expose pod nginx --port=80 --type=LoadBalancer --name=nginx-service --namespace=nginx-test
             # kubectl apply -f eks-test-pod.yaml
   
-        - name: Wait for LoadBalancer
-          run: |
-            echo "Waiting for AWS LoadBalancer provisioning..."
-            for i in {1..18}; do
-              HOSTNAME=$(kubectl get svc test-svc -n $KUBE_NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-              if [ -n "$HOSTNAME" ]; then
-                echo "Deployment finished"
-                echo "Service available at: http://$HOSTNAME"
-                echo "## Nginx Service" >> $GITHUB_STEP_SUMMARY
-                echo "http://$HOSTNAME" >> $GITHUB_STEP_SUMMARY
-                break
-              fi
-              echo "Pending... (attempt $i/18)"
-              sleep 10
-            done
-            if [ -z "$HOSTNAME" ]; then
-              echo "LoadBalancer still pending after 3 minutes. Check AWS console."
-              kubectl get svc test-svc -n $KUBE_NAMESPACE
-            fi
+        # - name: Wait for LoadBalancer
+        #   run: |
+        #     echo "Waiting for AWS LoadBalancer provisioning..."
+        #     for i in {1..18}; do
+        #       HOSTNAME=$(kubectl get svc test-svc -n $KUBE_NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+        #       if [ -n "$HOSTNAME" ]; then
+        #         echo "Deployment finished"
+        #         echo "Service available at: http://$HOSTNAME"
+        #         echo "## Nginx Service" >> $GITHUB_STEP_SUMMARY
+        #         echo "http://$HOSTNAME" >> $GITHUB_STEP_SUMMARY
+        #         break
+        #       fi
+        #       echo "Pending... (attempt $i/18)"
+        #       sleep 10
+        #     done
+        #     if [ -z "$HOSTNAME" ]; then
+        #       echo "LoadBalancer still pending after 3 minutes. Check AWS console."
+        #       kubectl get svc test-svc -n $KUBE_NAMESPACE
+        #     fi
