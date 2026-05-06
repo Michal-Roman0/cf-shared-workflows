@@ -192,6 +192,9 @@ jobs:
         id: set
         if: ${{inputs.output_DB_vars}}
         run: |
+          # get outputs as json file
+          terraform output -json > outputs.json
+          
           # default to empty
           DB_HOST=""
           DB_PORT=""
