@@ -1,0 +1,222 @@
+name: Terragrunt
+
+on:
+  workflow_call:
+    inputs:
+      # Path inside the calling repo where Terraform code lives
+      terraform_working_directory:
+        required: true
+        type: string
+
+      # dynamically read tf variables
+      tf_vars:
+        required: false
+        type: string
+
+      # Terraform variables (passed as JSON string or individual inputs)
+      # tf_vars:
+      #   required: false
+      #   type: string
+      #   default: "{}"
+      state_bucket_name:
+        required: true
+        type: string
+
+      # AWS specifics
+      aws_region:
+        required: true
+        type: string
+      terraform_plan_role_arn:
+        required: true
+        type: string
+      terraform_apply_role_arn:
+        required: true
+        type: string
+
+      environment:
+        required: true
+        type: string
+        description: "Github environment name to use"
+
+      run_apply:
+        required: false
+        type: boolean
+        default: false
+
+      output_DB_vars:
+        required: false
+        type: boolean
+        default: false
+        
+    # secrets:
+    # Optional
+    outputs:
+      db_host:
+        description: "DB host"
+        value: ${{ jobs.apply.outputs.db_host }}
+      db_port:
+        description: "DB port"
+        value: ${{ jobs.apply.outputs.db_port }}
+      db_name:
+        description: "DB name"
+        value: ${{ jobs.apply.outputs.db_name }}
+  
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform_working_directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.1"
+
+      - name: Setup Terragrunt
+        uses: autero1/action-terragrunt@v3.0.2
+        with:
+          # Terragrunt version to install. Examples: 0.52.0, latest
+          terragrunt-version: 1.0.8
+          
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6.0.0
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ inputs.terraform_plan_role_arn }}
+          role-session-name: Github-Plan
+
+      - name: Export TF vars
+        if: ${{ inputs.tf_vars != '' }}
+        run: |
+          # Read all vars from input to environment variables
+          echo '${{ inputs.tf_vars }}' > tfvars.json
+          for row in $(jq -r 'to_entries[] | "\(.key)=\(.value)"' tfvars.json); do
+            echo "TF_VAR_$row" >> $GITHUB_ENV
+          done
+
+          # # Add DB password if provided
+          # if [ -n "${{ secrets.DB_PASSWORD }}" ]; then
+          #   echo "TF_VAR_db_password=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          # fi
+
+          # # Add DB username if provided
+          # if [ -n "${{ secrets.DB_USER }}" ]; then
+          #   echo "TF_VAR_db_username=${{ secrets.DB_USER }}" >> $GITHUB_ENV
+          # fi
+
+      - name: Terragrunt run all Init
+        run: terragrunt run --all init
+
+      - name: Terragrunt Validate
+        run: terragrunt run --all validate
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.52.0
+          cache: true
+
+      - name: Init TFLint
+        run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run TFLint
+        run: tflint -f compact --recursive
+        working-directory: ../../infrastructure-modules
+
+      - name: Terragrunt Plan
+        env:
+          TF_VAR_aws_region: ${{ inputs.aws_region }}
+          TF_VAR_website_bucket_name: ${{ inputs.state_bucket_name }}
+          TF_VAR_db_username: ${{ secrets.DB_USER }}
+          TF_VAR_db_password: ${{secrets.DB_PASSWORD }}
+        run: |
+          terragrunt run -all plan --out-dir ./plan.tfplan
+
+      - name: Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ./${{ inputs.terraform_working_directory }}/plan.tfplan
+
+  apply:
+    needs: [plan]
+    if: inputs.run_apply == true && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      db_host: ${{ steps.set.outputs.db_host }}
+      db_port: ${{ steps.set.outputs.db_port }}
+      db_name: ${{ steps.set.outputs.db_name }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.terraform_working_directory }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.14.1"
+
+      - name: Setup Terragrunt
+        uses: autero1/action-terragrunt@v3.0.2
+        with:
+          # Terragrunt version to install. Examples: 0.52.0, latest
+          terragrunt-version: 1.0.8
+
+      - name: Configure AWS Credentials (Apply)
+        uses: aws-actions/configure-aws-credentials@v6.0.0
+        with:
+          aws-region: ${{ inputs.aws_region }}
+          role-to-assume: ${{ inputs.terraform_apply_role_arn }}
+          role-session-name: Github-Apply
+
+      - name: Download Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ./${{ inputs.terraform_working_directory }}/
+
+      - name: Terragrunt run all Init
+        run: terragrunt run --all init
+
+      - name: Terragrunt Apply
+        run: terragrunt run -all apply --out-dir ./plan.tfplan
+
+      - name: Extract Terraform outputs (optional) and set step outputs
+        id: set
+        if: ${{inputs.output_DB_vars}}
+        run: |
+          # get outputs as json file
+          terraform output -json > outputs.json
+          
+          # default to empty
+          DB_HOST=""
+          DB_PORT=""
+          DB_NAME=""
+
+          if [ -f outputs.json ]; then
+            # extract but allow jq to produce "null" or empty; use || to keep empty
+            DB_HOST=$(jq -r '.rds_address.value // empty' outputs.json || true)
+            DB_PORT=$(jq -r '.rds_port.value // empty' outputs.json || true)
+            DB_NAME=$(jq -r '.rds_db_name.value // empty' outputs.json || true)
+          fi
+
+          echo "db_host=$DB_HOST" >> $GITHUB_OUTPUT
+          echo "db_port=$DB_PORT" >> $GITHUB_OUTPUT
+          echo "db_name=$DB_NAME" >> $GITHUB_OUTPUT
