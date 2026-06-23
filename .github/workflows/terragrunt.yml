@@ -8,6 +8,10 @@ on:
         required: true
         type: string
 
+      terraform_modules_dir:
+        required: true
+        type: string
+
       # dynamically read tf variables
       tf_vars:
         required: false
@@ -136,7 +140,7 @@ jobs:
 
       - name: Run TFLint
         run: tflint -f compact --recursive
-        working-directory: ../../infrastructure-modules
+        working-directory: ${{ inputs.terraform_modules_dir }}
 
       - name: Terragrunt Plan
         env:
