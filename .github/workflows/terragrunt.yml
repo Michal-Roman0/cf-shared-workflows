@@ -192,6 +192,27 @@ jobs:
           role-to-assume: ${{ inputs.terraform_apply_role_arn }}
           role-session-name: Github-Apply
 
+      - name: Export TF vars
+        #if: ${{ inputs.tf_vars != '' }}
+        run: |
+          # Read all vars from input to environment variables
+          # if: ${{ inputs.tf_vars != '' }}
+          #   echo '${{ inputs.tf_vars }}' > tfvars.json
+          #   for row in $(jq -r 'to_entries[] | "\(.key)=\(.value)"' tfvars.json); do
+          #     echo "TF_VAR_$row" >> $GITHUB_ENV
+          #   done
+          # fi
+
+          # Add DB password if provided
+          if [ -n "${{ secrets.DB_PASSWORD }}" ]; then
+            echo "TF_VAR_db_password=${{ secrets.DB_PASSWORD }}" >> $GITHUB_ENV
+          fi
+
+          # Add DB username if provided
+          if [ -n "${{ secrets.DB_USER }}" ]; then
+            echo "TF_VAR_db_username=${{ secrets.DB_USER }}" >> $GITHUB_ENV
+          fi
+
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
