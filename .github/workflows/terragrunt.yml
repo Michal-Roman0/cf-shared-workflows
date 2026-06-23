@@ -149,7 +149,7 @@ jobs:
           TF_VAR_db_username: ${{ secrets.DB_USER }}
           TF_VAR_db_password: ${{secrets.DB_PASSWORD }}
         run: |
-          terragrunt run -all plan --out-dir ./plan -- -lock=false
+          terragrunt run -all plan --out-dir ./plan -parallelism=1
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -224,7 +224,7 @@ jobs:
 
       - name: Terragrunt Apply
         #run: terragrunt run --all --non-interactive -- apply --out-dir ./plan.tfplan
-        run: terragrunt run -all apply --out-dir plan --non-interactive
+        run: terragrunt run -all apply --out-dir plan --non-interactive -parallelism=1
         
       - name: Extract Terraform outputs (optional) and set step outputs
         id: set
