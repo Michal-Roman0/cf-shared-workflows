@@ -223,7 +223,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: plan
-          path: ./${{ inputs.terraform_working_directory }}/
+          path: . #./${{ inputs.terraform_working_directory }}/
           
       - name: Debug after download
         run: |
