@@ -149,7 +149,7 @@ jobs:
           TF_VAR_db_username: ${{ secrets.DB_USER }}
           TF_VAR_db_password: ${{secrets.DB_PASSWORD }}
         run: |
-          terragrunt run -all plan --out-dir ./plan
+          terragrunt run -all plan --out-dir ./plan -- -lock=false
 
       - name: Upload Plan Artifact
         uses: actions/upload-artifact@v4
@@ -212,24 +212,12 @@ jobs:
           if [ -n "${{ secrets.DB_USER }}" ]; then
             echo "TF_VAR_db_username=${{ secrets.DB_USER }}" >> $GITHUB_ENV
           fi
-
-
-      - name: DEBUG
-        run: |
-          ls -la
-          pwd
           
       - name: Download Plan
         uses: actions/download-artifact@v4
         with:
           name: plan
           path: ${{ inputs.terraform_working_directory }}
-          
-      - name: Debug after download
-        run: |
-          echo "terraform_working_directory=${{ inputs.terraform_working_directory }}"
-          pwd
-          ls -la
 
       - name: Terragrunt run all Init
         run: terragrunt run --all init
