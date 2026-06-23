@@ -229,7 +229,7 @@ jobs:
         run: |
           echo "terraform_working_directory=${{ inputs.terraform_working_directory }}"
           pwd
-          ls -la ${{ inputs.terraform_working_directory }}/
+          #ls -la ${{ inputs.terraform_working_directory }}
 
       - name: Terragrunt run all Init
         run: terragrunt run --all init
