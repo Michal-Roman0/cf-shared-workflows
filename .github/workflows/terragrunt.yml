@@ -224,8 +224,8 @@ jobs:
 
       - name: Terragrunt Apply
         #run: terragrunt run --all --non-interactive -- apply --out-dir ./plan.tfplan
-        #run: terragrunt run -all apply --out-dir plan --non-interactive -parallelism=1
-        run: terragrunt run -all apply --non-interactive -parallelism=1
+        run: terragrunt run -all apply --out-dir plan --non-interactive -parallelism=1
+        #run: terragrunt run -all apply --non-interactive -parallelism=1
         
       - name: Extract Terraform outputs (optional) and set step outputs
         id: set
